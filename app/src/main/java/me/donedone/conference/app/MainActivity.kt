@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun CardItem(cardItem: CardItem) {
     Card(
+        modifier = Modifier.padding(horizontal = 12.dp),
         shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(
             containerColor = Blue02,
