@@ -1,6 +1,7 @@
 package me.donedone.conference.app
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,37 +32,66 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.MutableLiveData
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import me.donedone.conference.app.network.entity.ApiResult
 import me.donedone.conference.app.presentation.CardItem
+import me.donedone.conference.app.repository.EventRepository
 import me.donedone.conference.app.ui.theme.Blue02
 import me.donedone.conference.app.ui.theme.ConferenceAppTheme
 import me.donedone.conference.app.ui.theme.Gray02
 import me.donedone.conference.app.ui.theme.Gray03
 
 class MainActivity : ComponentActivity() {
+
+    private val eventRepository = EventRepository()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val cardItemList = MutableLiveData<List<CardItem>>(emptyList())
+
+        CoroutineScope(Dispatchers.Default).launch {
+            eventRepository.getEventAll().collect { apiResult ->
+                when (apiResult) {
+                    is ApiResult.Success -> {
+                        cardItemList.postValue(apiResult.value.rows?.mapNotNull {
+                            CardItem(
+                                thumbnail = it?.metadata?.coverImage ?: "",
+                                contentDesc = it?.name ?: "",
+                                location = it?.location?.name ?: "",
+                                date = "${it?.startDate}~${it?.endDate}",
+                                heart = true
+                            )
+                        } ?: emptyList())
+                    }
+
+                    is ApiResult.Empty, is ApiResult.Error -> {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "check network status",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+        }
+
         setContent {
 
             ConferenceAppTheme {
 
-                val list = remember {
-                    List(50) {
-                        CardItem(
-                            thumbnail = "https://cf.festa.io/img/2023-8-4/5beffbd8-9861-4e33-8d18-d504fdebad47.png",
-                            contentDesc = "2024 성빈랜드 컨퍼런스 • 4월 13일",
-                            location = "잠실 롯데월드타워",
-                            date = "4월 13일",
-                            heart = true
-                        )
-                    }
-                }
+                val list = cardItemList.observeAsState()
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(list) { card ->
+                    items(list.value?: emptyList()) { card ->
                         CardItem(cardItem = card)
                     }
                 }
